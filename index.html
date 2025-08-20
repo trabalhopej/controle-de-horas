@@ -645,16 +645,8 @@
                 setupEventListeners();
                 listenForMonthlyChanges();
                 
-                // Register Service Worker for PWA
-                const swCode = `
-                  self.addEventListener('install', (e) => {});
-                  self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request)));
-                `;
-                const swBlob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(swBlob);
-
                 if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.register(swUrl)
+                  navigator.serviceWorker.register('sw.js')
                     .then((reg) => console.log('Service worker registered.', reg))
                     .catch((err) => console.error('Service worker registration failed.', err));
                 }
