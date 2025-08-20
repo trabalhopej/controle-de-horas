@@ -7,10 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display-swap" rel="stylesheet">
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJzaG9ydF9uYW1lIjogIkhvcmFzIEFwcCIsCiAgIm5hbWUiOiAiUGFpbmVsIGRlIENvbnRyb2xlIGRlIEhvcmFzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vMTkyeDE5Mi8wZDk0ODgvZmZmZmZmP3RleHQ9SG9yYXMiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiIKICAgIH0sCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vNTEyeDUxMi8wZDk0ODgvZmZmZmZmP3RleHQ9SG9yYXMiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIKICAgIH0KICBdLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjc2NmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiCn0=">
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJzaG9ydF9uYW1lIjogIkhvcmFzIEFwcCIsCiAgIm5hbWUiOiAiUGFpbmVsIGRlIENvbnRyb2xlIGRlIEhvcmFzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9pY29ucy5pY29uYXJjaGl2ZS5jb20vaWNvbnMvZ29vZ2xlL25vdG8tZW1vamktb2JqZWN0cy8xMjgvYnJpZWZjYXNlLWljb24ucG5nIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIiwKICAgICAgInNpemVzIjogIjEyOHgxMjgiCiAgICB9LAogICAgewogICAgICAic3JjIjogImh0dHBzOi8vaWNvbnMuaWNvbmFyY2hpdmUuY29tL2ljb25zL2dvb2dsZS9ub3RvLWVtb2ppLW9iamVjdHMvMTkyL2JyaWVmY2FzZS1pY29uLnBuZyIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIgogICAgfSwKICAgIHsKICAgICAgInNyYyI6ICJodHRwczovL2ljb25zLmljb25hcmNoaXZlLmNvbS9pY29ucy9nb29nbGUvbm90by1lbW9qaS1vYmplY3RzLzUxMi9icmllZmNhc2UtaWNvbi5wbmciLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIKICAgIH0KICBdLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjc2NmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiCn0=">
+    <link rel="icon" type="image/png" href="https://icons.iconarchive.com/icons/google/noto-emoji-objects/32/briefcase-icon.png">
     <meta name="theme-color" content="#0f766e">
 
     <!-- Firebase SDKs v9 -->
@@ -644,16 +645,8 @@
                 setupEventListeners();
                 listenForMonthlyChanges();
                 
-                // Register Service Worker for PWA
-                const swCode = `
-                  self.addEventListener('install', (e) => {});
-                  self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request)));
-                `;
-                const swBlob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(swBlob);
-
                 if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.register(swUrl)
+                  navigator.serviceWorker.register('sw.js')
                     .then((reg) => console.log('Service worker registered.', reg))
                     .catch((err) => console.error('Service worker registration failed.', err));
                 }
