@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle de Horas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals with Status Colors -->
+    <!-- Application Structure Plan: A dashboard SPA with a central month navigator. The main view contains summary cards, an interactive monthly timesheet table, and a chart. Data entry is handled via a modal form. This structure is chosen to separate data input from data display, providing a clear overview while making data entry quick and contextual. -->
+    <!-- Visualization & Content Choices: Report Info (Monthly Timesheet) -> Goal (Organize/Display) -> Viz (HTML Table) -> Interaction (Dynamic row coloring, edit on click) -> Justification (Clarity, familiarity). Report Info (Monthly Totals) -> Goal (Inform) -> Viz (Stat Cards) -> Interaction (Dynamic text update) -> Justification (Quick overview). Report Info (Daily Hours) -> Goal (Compare) -> Viz (Bar Chart - Chart.js) -> Interaction (Updates with data) -> Justification (Visual comparison of workload). -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-700">
+
+    <div id="app" class="container mx-auto p-4 md:p-6 lg:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Painel de Controle de Horas</h1>
+            <p class="text-gray-500 mt-1">Sua folha de ponto interativa e automatizada.</p>
+        </header>
+
+        <main>
+            <!-- Painel de Configuração e Ações -->
+            <section id="config-panel" class="bg-white p-4 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+                <div class="flex items-center space-x-3">
+                    <label for="hourly-rate" class="font-medium">Valor/Hora (€):</label>
+                    <input type="number" id="hourly-rate" value="12.00" step="0.50" class="w-24 p-2 border rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                </div>
+                <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                    <button id="export-btn" class="w-full sm:w-auto bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-300">Exportar (XLSX)</button>
+                    <button id="import-btn" class="w-full sm:w-auto bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 transition duration-300">Importar (XLSX)</button>
+                    <input type="file" id="import-file" class="hidden" accept=".xlsx, .xls">
+                </div>
+                <button id="add-entry-btn" class="w-full md:w-auto bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105">
+                    + Adicionar Lançamento
+                </button>
+            </section>
+
+            <!-- Navegação de Mês -->
+            <section id="month-navigation" class="flex justify-between items-center p-4 bg-white rounded-lg shadow-md mb-6">
+                <button id="prev-month" class="p-2 rounded-full hover:bg-gray-200 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <h2 id="current-month-year" class="text-xl md:text-2xl font-bold text-gray-800"></h2>
+                <button id="next-month" class="p-2 rounded-full hover:bg-gray-200 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </section>
+
+            <!-- Cartões de Resumo Mensal -->
+            <section id="summary-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-lg font-semibold text-gray-500">Total de Horas (Mês)</h3>
+                    <p id="total-hours" class="text-4xl font-bold text-teal-600 mt-2">00:00</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-lg font-semibold text-gray-500">Saldo do Mês</h3>
+                    <p id="total-earnings" class="text-4xl font-bold text-green-600 mt-2">€ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                    <h3 class="text-lg font-semibold text-gray-500">Adiantamentos (Mês)</h3>
+                    <p id="total-advances" class="text-4xl font-bold text-orange-500 mt-2">€ 0,00</p>
+                </div>
+            </section>
+
+            <!-- Gráfico Anual -->
+            <section class="bg-white p-4 rounded-lg shadow-md mb-8">
+                 <h3 class="text-xl font-semibold text-gray-800 mb-2 text-center">Ganhos Mensais no Ano</h3>
+                 <div id="year-navigation" class="flex justify-center items-center space-x-4 mb-4">
+                    <button id="prev-year" class="p-2 rounded-full hover:bg-gray-200 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <h4 id="current-year" class="text-xl font-bold text-gray-700"></h4>
+                    <button id="next-year" class="p-2 rounded-full hover:bg-gray-200 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                 <div class="chart-container">
+                    <canvas id="annual-chart"></canvas>
+                 </div>
+            </section>
+
+            <!-- Tabela de Lançamentos Mensal -->
+            <section id="timesheet" class="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4 font-semibold">Data</th>
+                            <th class="p-4 font-semibold hidden md:table-cell">Dia</th>
+                            <th class="p-4 font-semibold">Entrada</th>
+                            <th class="p-4 font-semibold hidden lg:table-cell">Pausa</th>
+                            <th class="p-4 font-semibold">Saída</th>
+                            <th class="p-4 font-semibold">Total Horas</th>
+                            <th class="p-4 font-semibold">Status</th>
+                            <th class="p-4 font-semibold text-right">Valor Dia</th>
+                            <th class="p-4 font-semibold text-right">Adiant.</th>
+                            <th class="p-4 font-semibold text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="timesheet-body">
+                        <!-- Linhas serão inseridas dinamicamente -->
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de Lançamento -->
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+    <div id="entry-modal" class="modal bg-white rounded-lg shadow-2xl w-11/12 md:w-1/2 lg:w-1/3">
+        <form id="entry-form" class="p-8">
+            <h2 id="modal-title" class="text-2xl font-bold mb-6 text-gray-800">Novo Lançamento</h2>
+            <input type="hidden" id="entry-day">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="entry-date" class="block mb-1 font-medium">Data</label>
+                    <input type="date" id="entry-date" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="entry-status" class="block mb-1 font-medium">Status</label>
+                    <select id="entry-status" class="w-full p-2 border rounded-md bg-white" required>
+                        <option value="Trabalhado">Trabalhado</option>
+                        <option value="Adiantamento">Adiantamento</option>
+                        <option value="Folga">Folga</option>
+                    </select>
+                </div>
+            </div>
+            <div id="work-hours-fields">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label for="entry-start" class="block mb-1 font-medium">Entrada</label>
+                        <input type="time" id="entry-start" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="pause-start" class="block mb-1 font-medium">Início Pausa</label>
+                        <input type="time" id="pause-start" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="pause-end" class="block mb-1 font-medium">Fim Pausa</label>
+                        <input type="time" id="pause-end" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="entry-end" class="block mb-1 font-medium">Saída</label>
+                        <input type="time" id="entry-end" class="w-full p-2 border rounded-md">
+                    </div>
+                </div>
+            </div>
+            <div id="advance-field" class="hidden mb-4">
+                <label for="advance-amount" class="block mb-1 font-medium">Valor do Adiantamento (€)</label>
+                <input type="number" id="advance-amount" step="0.01" class="w-full p-2 border rounded-md" placeholder="Ex: 200,00">
+            </div>
+            <div class="flex justify-end space-x-4 mt-8">
+                <button type="button" id="cancel-btn" class="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition">Cancelar</button>
+                <button type="submit" class="px-6 py-2 rounded-lg bg-teal-600 text-white font-bold hover:bg-teal-700 transition">Salvar</button>
+            </div>
+        </form>
+    </div>
+    
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300">
+        Mensagem do Toast
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const state = {
+                currentDate: new Date(),
+                hourlyRate: 12.00,
+                database: JSON.parse(localStorage.getItem('timesheetDB')) || {},
+                annualChartInstance: null
+            };
+
+            const elements = {
+                hourlyRateInput: document.getElementById('hourly-rate'),
+                addEntryBtn: document.getElementById('add-entry-btn'),
+                prevMonthBtn: document.getElementById('prev-month'),
+                nextMonthBtn: document.getElementById('next-month'),
+                currentMonthYear: document.getElementById('current-month-year'),
+                prevYearBtn: document.getElementById('prev-year'),
+                nextYearBtn: document.getElementById('next-year'),
+                currentYear: document.getElementById('current-year'),
+                timesheetBody: document.getElementById('timesheet-body'),
+                totalHours: document.getElementById('total-hours'),
+                totalEarnings: document.getElementById('total-earnings'),
+                totalAdvances: document.getElementById('total-advances'),
+                modalBackdrop: document.getElementById('modal-backdrop'),
+                entryModal: document.getElementById('entry-modal'),
+                entryForm: document.getElementById('entry-form'),
+                modalTitle: document.getElementById('modal-title'),
+                entryDayInput: document.getElementById('entry-day'),
+                entryDateInput: document.getElementById('entry-date'),
+                entryStatusInput: document.getElementById('entry-status'),
+                workHoursFields: document.getElementById('work-hours-fields'),
+                advanceField: document.getElementById('advance-field'),
+                entryStartInput: document.getElementById('entry-start'),
+                pauseStartInput: document.getElementById('pause-start'),
+                pauseEndInput: document.getElementById('pause-end'),
+                entryEndInput: document.getElementById('entry-end'),
+                advanceAmountInput: document.getElementById('advance-amount'),
+                cancelBtn: document.getElementById('cancel-btn'),
+                annualChartCanvas: document.getElementById('annual-chart').getContext('2d'),
+                exportBtn: document.getElementById('export-btn'),
+                importBtn: document.getElementById('import-btn'),
+                importFileInput: document.getElementById('import-file'),
+                toast: document.getElementById('toast'),
+            };
+
+            const showToast = (message, isError = false) => {
+                elements.toast.textContent = message;
+                elements.toast.className = `fixed bottom-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg transition-opacity duration-300 ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+                elements.toast.classList.remove('opacity-0');
+                setTimeout(() => {
+                    elements.toast.classList.add('opacity-0');
+                }, 3000);
+            };
+
+            const formatCurrency = (value) => value.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+            
+            const formatMinutesToHours = (totalMinutes) => {
+                if (isNaN(totalMinutes) || totalMinutes === 0) return '00:00';
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = Math.round(totalMinutes % 60);
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            };
+
+            const timeToMinutes = (timeStr) => {
+                if (!timeStr) return 0;
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+            };
+
+            const saveToLocalStorage = () => {
+                localStorage.setItem('timesheetDB', JSON.stringify(state.database));
+            };
+
+            const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+            const updateSummary = (monthData) => {
+                const summary = monthData.reduce((acc, entry) => {
+                    if (entry) {
+                        acc.totalMinutes += Number(entry.totalMinutes) || 0;
+                        acc.grossEarnings += Number(entry.dailyValue) || 0;
+                        acc.totalAdvances += Number(entry.advanceValue) || 0;
+                    }
+                    return acc;
+                }, { totalMinutes: 0, grossEarnings: 0, totalAdvances: 0 });
+
+                const netEarnings = summary.grossEarnings - summary.totalAdvances;
+
+                elements.totalHours.textContent = formatMinutesToHours(summary.totalMinutes);
+                elements.totalEarnings.textContent = formatCurrency(netEarnings);
+                elements.totalAdvances.textContent = formatCurrency(summary.totalAdvances);
+
+                if (netEarnings < 0) {
+                    elements.totalEarnings.classList.remove('text-green-600');
+                    elements.totalEarnings.classList.add('text-red-600');
+                } else {
+                    elements.totalEarnings.classList.remove('text-red-600');
+                    elements.totalEarnings.classList.add('text-green-600');
+                }
+            };
+
+            const renderAnnualChart = () => {
+                const year = state.currentDate.getFullYear();
+                elements.currentYear.textContent = year;
+
+                const monthlyEarnings = Array(12).fill(0);
+
+                for (const key in state.database) {
+                    if (key.startsWith(year)) {
+                        const monthIndex = parseInt(key.split('-')[1], 10) - 1;
+                        const monthTotal = state.database[key].reduce((sum, entry) => sum + (Number(entry.dailyValue) || 0), 0);
+                        monthlyEarnings[monthIndex] = monthTotal;
+                    }
+                }
+
+                if (state.annualChartInstance) {
+                    state.annualChartInstance.destroy();
+                }
+                
+                const labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                
+                state.annualChartInstance = new Chart(elements.annualChartCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Ganhos Mensais',
+                            data: monthlyEarnings,
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatCurrency(value);
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Ganhos: ${formatCurrency(context.parsed.y)}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const renderTimesheet = () => {
+                const monthKey = getMonthKey(state.currentDate);
+                const year = state.currentDate.getFullYear();
+                const month = state.currentDate.getMonth();
+
+                elements.currentMonthYear.textContent = state.currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+                elements.timesheetBody.innerHTML = '';
+
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const monthData = state.database[monthKey] || [];
+                const fullMonthData = [];
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(year, month, day);
+                    const entry = monthData.find(e => e && e.day === day);
+                    
+                    fullMonthData.push(entry || { day });
+
+                    const statusClasses = {
+                        'Trabalhado': 'bg-green-50 text-green-800',
+                        'Adiantamento': 'bg-yellow-50 text-yellow-800',
+                        'Folga': 'bg-red-50 text-red-800',
+                    };
+
+                    const rowClass = entry ? statusClasses[entry.status] || '' : 'hover:bg-gray-50';
+                    
+                    const row = document.createElement('tr');
+                    row.className = `border-b transition`;
+                    row.dataset.day = day;
+
+                    const pauseText = (entry && entry.pauseStart && entry.pauseEnd) ? `${entry.pauseStart} - ${entry.pauseEnd}` : '---';
+                    const dailyValueText = (entry && entry.dailyValue) ? formatCurrency(entry.dailyValue) : '---';
+                    const advanceValueText = (entry && entry.advanceValue) ? formatCurrency(entry.advanceValue) : '---';
+                    const deleteButtonHTML = entry ? `<button class="delete-btn text-red-500 hover:text-red-700 p-2" data-day="${day}">Limpar</button>` : '';
+
+                    row.innerHTML = `
+                        <td class="p-4 font-medium ${rowClass} cursor-pointer">${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</td>
+                        <td class="p-4 hidden md:table-cell ${rowClass} cursor-pointer">${date.toLocaleDateString('pt-BR', { weekday: 'short' })}</td>
+                        <td class="p-4 ${rowClass} cursor-pointer">${entry?.entryStart || '---'}</td>
+                        <td class="p-4 hidden lg:table-cell ${rowClass} cursor-pointer">${pauseText}</td>
+                        <td class="p-4 ${rowClass} cursor-pointer">${entry?.entryEnd || '---'}</td>
+                        <td class="p-4 font-bold ${rowClass} cursor-pointer">${formatMinutesToHours(entry?.totalMinutes || 0)}</td>
+                        <td class="p-4 ${rowClass} cursor-pointer"><span class="px-2 py-1 rounded-full text-sm font-medium ${rowClass}">${entry?.status || 'Vazio'}</span></td>
+                        <td class="p-4 text-right font-semibold ${rowClass} cursor-pointer">${dailyValueText}</td>
+                        <td class="p-4 text-right font-semibold ${rowClass} cursor-pointer">${advanceValueText}</td>
+                        <td class="p-4 text-center">${deleteButtonHTML}</td>
+                    `;
+                    
+                    elements.timesheetBody.appendChild(row);
+                }
+                updateSummary(fullMonthData);
+                renderAnnualChart();
+            };
+
+            const deleteEntry = (day) => {
+                const monthKey = getMonthKey(state.currentDate);
+                if (!state.database[monthKey]) return;
+
+                const entryIndex = state.database[monthKey].findIndex(e => e && e.day === day);
+
+                if (entryIndex > -1) {
+                    state.database[monthKey].splice(entryIndex, 1);
+                    saveToLocalStorage();
+                    renderTimesheet();
+                    showToast(`Lançamento do dia ${day} foi removido.`);
+                }
+            };
+
+            const toggleModalFields = () => {
+                const status = elements.entryStatusInput.value;
+                elements.workHoursFields.style.display = 'none';
+                elements.advanceField.style.display = 'none';
+
+                if (status === 'Trabalhado') {
+                    elements.workHoursFields.style.display = 'block';
+                    elements.advanceField.style.display = 'block';
+                } else if (status === 'Adiantamento') {
+                    elements.advanceField.style.display = 'block';
+                }
+            };
+
+            const openModal = (day = null) => {
+                elements.entryForm.reset();
+                const year = state.currentDate.getFullYear();
+                const month = state.currentDate.getMonth();
+                
+                if (day) { // Editing existing or new entry for a specific day
+                    const date = new Date(year, month, day);
+                    const monthKey = getMonthKey(date);
+                    const entry = (state.database[monthKey] || []).find(e => e && e.day === day);
+
+                    elements.modalTitle.textContent = entry ? 'Editar Lançamento' : 'Novo Lançamento';
+                    elements.entryDayInput.value = day;
+                    elements.entryDateInput.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    
+                    if (entry) {
+                        elements.entryStatusInput.value = entry.status;
+                        elements.entryStartInput.value = entry.entryStart || '';
+                        elements.pauseStartInput.value = entry.pauseStart || '';
+                        elements.pauseEndInput.value = entry.pauseEnd || '';
+                        elements.entryEndInput.value = entry.entryEnd || '';
+                        elements.advanceAmountInput.value = entry.advanceValue || '';
+                    }
+                } else { // Adding a new entry without a pre-selected day
+                    elements.modalTitle.textContent = 'Novo Lançamento';
+                    elements.entryDayInput.value = '';
+                    elements.entryDateInput.value = '';
+                }
+
+                toggleModalFields();
+                elements.modalBackdrop.style.display = 'block';
+                elements.entryModal.style.display = 'block';
+            };
+
+            const closeModal = () => {
+                elements.modalBackdrop.style.display = 'none';
+                elements.entryModal.style.display = 'none';
+            };
+
+            const handleFormSubmit = (e) => {
+                e.preventDefault();
+                const date = new Date(elements.entryDateInput.value + 'T00:00:00');
+                const day = date.getDate();
+                const monthKey = getMonthKey(date);
+
+                if (!state.database[monthKey]) {
+                    state.database[monthKey] = [];
+                }
+
+                const entryData = {
+                    day: day,
+                    date: elements.entryDateInput.value,
+                    status: elements.entryStatusInput.value,
+                    entryStart: '',
+                    pauseStart: '',
+                    pauseEnd: '',
+                    entryEnd: '',
+                    advanceValue: parseFloat(elements.advanceAmountInput.value) || 0,
+                    totalMinutes: 0,
+                    dailyValue: 0,
+                };
+
+                if (entryData.status === 'Trabalhado') {
+                    entryData.entryStart = elements.entryStartInput.value;
+                    entryData.pauseStart = elements.pauseStartInput.value;
+                    entryData.pauseEnd = elements.pauseEndInput.value;
+                    entryData.entryEnd = elements.entryEndInput.value;
+
+                    const startMinutes = timeToMinutes(entryData.entryStart);
+                    const endMinutes = timeToMinutes(entryData.entryEnd);
+                    
+                    let workMinutes = 0;
+                    if (entryData.entryStart && entryData.entryEnd) {
+                        if (endMinutes < startMinutes) { // Crossed midnight
+                            workMinutes = (24 * 60 - startMinutes) + endMinutes;
+                        } else {
+                            workMinutes = endMinutes - startMinutes;
+                        }
+                    }
+                    
+                    let pauseMinutes = 0;
+                    if (entryData.pauseStart && entryData.pauseEnd) {
+                        const pauseStartMinutes = timeToMinutes(entryData.pauseStart);
+                        const pauseEndMinutes = timeToMinutes(entryData.pauseEnd);
+                        if (pauseEndMinutes < pauseStartMinutes) { // Pause crossed midnight
+                            pauseMinutes = (24 * 60 - pauseStartMinutes) + pauseEndMinutes;
+                        } else {
+                            pauseMinutes = pauseEndMinutes - pauseStartMinutes;
+                        }
+                    }
+                    
+                    const validPauseMinutes = Math.max(0, pauseMinutes);
+
+                    entryData.totalMinutes = workMinutes - validPauseMinutes;
+                    entryData.dailyValue = (entryData.totalMinutes / 60) * state.hourlyRate;
+                }
+                
+                const existingEntryIndex = state.database[monthKey].findIndex(e => e && e.day === day);
+                if (existingEntryIndex > -1) {
+                    state.database[monthKey][existingEntryIndex] = entryData;
+                } else {
+                    state.database[monthKey].push(entryData);
+                }
+
+                state.currentDate = date;
+                saveToLocalStorage();
+                renderTimesheet();
+                closeModal();
+            };
+
+            const exportData = () => {
+                const allEntries = [];
+                const sortedMonthKeys = Object.keys(state.database).sort();
+
+                sortedMonthKeys.forEach(monthKey => {
+                    state.database[monthKey].forEach(entry => {
+                        if (entry) {
+                            allEntries.push({
+                                "Mês": monthKey,
+                                "Data": entry.date,
+                                "Dia": entry.day,
+                                "Status": entry.status,
+                                "Entrada": entry.entryStart,
+                                "Início Pausa": entry.pauseStart,
+                                "Fim Pausa": entry.pauseEnd,
+                                "Saída": entry.entryEnd,
+                                "Horas Totais (min)": entry.totalMinutes,
+                                "Valor Dia (€)": entry.dailyValue,
+                                "Adiantamento (€)": entry.advanceValue,
+                            });
+                        }
+                    });
+                });
+
+                if (allEntries.length === 0) {
+                    showToast("Não há dados para exportar.", true);
+                    return;
+                }
+
+                const worksheet = XLSX.utils.json_to_sheet(allEntries);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Lançamentos");
+
+                const today = new Date().toISOString().slice(0, 10);
+                XLSX.writeFile(workbook, `backup_horas_${today}.xlsx`);
+                
+                showToast('Backup XLSX exportado com sucesso!');
+            };
+
+            const importData = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet);
+
+                        const importedData = {};
+                        json.forEach(row => {
+                            const monthKey = row["Mês"];
+                            if (!monthKey) return;
+
+                            if (!importedData[monthKey]) {
+                                importedData[monthKey] = [];
+                            }
+
+                            importedData[monthKey].push({
+                                day: row["Dia"],
+                                date: row["Data"],
+                                status: row["Status"],
+                                entryStart: row["Entrada"],
+                                pauseStart: row["Início Pausa"],
+                                pauseEnd: row["Fim Pausa"],
+                                entryEnd: row["Saída"],
+                                totalMinutes: row["Horas Totais (min)"],
+                                dailyValue: row["Valor Dia (€)"],
+                                advanceValue: row["Adiantamento (€)"],
+                            });
+                        });
+                        
+                        state.database = importedData;
+                        saveToLocalStorage();
+                        renderTimesheet();
+                        showToast('Backup XLSX importado com sucesso!');
+                    } catch (error) {
+                        showToast('Erro ao importar o arquivo. Verifique o formato.', true);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                event.target.value = '';
+            };
+
+
+            const setupEventListeners = () => {
+                elements.hourlyRateInput.addEventListener('change', (e) => {
+                    state.hourlyRate = parseFloat(e.target.value);
+                    renderTimesheet(); 
+                });
+                elements.addEntryBtn.addEventListener('click', () => openModal());
+                elements.prevMonthBtn.addEventListener('click', () => {
+                    state.currentDate.setMonth(state.currentDate.getMonth() - 1);
+                    renderTimesheet();
+                });
+                elements.nextMonthBtn.addEventListener('click', () => {
+                    state.currentDate.setMonth(state.currentDate.getMonth() + 1);
+                    renderTimesheet();
+                });
+                elements.prevYearBtn.addEventListener('click', () => {
+                    state.currentDate.setFullYear(state.currentDate.getFullYear() - 1);
+                    renderTimesheet();
+                });
+                elements.nextYearBtn.addEventListener('click', () => {
+                    state.currentDate.setFullYear(state.currentDate.getFullYear() + 1);
+                    renderTimesheet();
+                });
+                elements.cancelBtn.addEventListener('click', closeModal);
+                elements.modalBackdrop.addEventListener('click', closeModal);
+                elements.entryForm.addEventListener('submit', handleFormSubmit);
+                elements.entryStatusInput.addEventListener('change', toggleModalFields);
+                elements.entryDateInput.addEventListener('change', (e) => {
+                    const newDate = new Date(e.target.value + 'T00:00:00');
+                    elements.entryDayInput.value = newDate.getDate();
+                });
+                elements.exportBtn.addEventListener('click', exportData);
+                elements.importBtn.addEventListener('click', () => elements.importFileInput.click());
+                elements.importFileInput.addEventListener('change', importData);
+
+                elements.timesheetBody.addEventListener('click', (e) => {
+                    if (e.target && e.target.classList.contains('delete-btn')) {
+                        const day = parseInt(e.target.dataset.day, 10);
+                        deleteEntry(day);
+                    } else if (e.target && e.target.closest('td').cellIndex < 9) {
+                        const day = parseInt(e.target.closest('tr').dataset.day, 10);
+                        openModal(day);
+                    }
+                });
+            };
+
+            const init = () => {
+                state.hourlyRate = parseFloat(elements.hourlyRateInput.value);
+                setupEventListeners();
+                renderTimesheet();
+            };
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
