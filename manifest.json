@@ -1,0 +1,25 @@
+{
+  "short_name": "Horas App",
+  "name": "Painel de Controle de Horas",
+  "icons": [
+    {
+      "src": "https://icons.iconarchive.com/icons/google/noto-emoji-objects/128/briefcase-icon.png",
+      "type": "image/png",
+      "sizes": "128x128"
+    },
+    {
+      "src": "https://icons.iconarchive.com/icons/google/noto-emoji-objects/192/briefcase-icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://icons.iconarchive.com/icons/google/noto-emoji-objects/512/briefcase-icon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f766e",
+  "background_color": "#f8f9fa"
+}
