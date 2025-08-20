@@ -8,9 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- Firebase SDKs v9 -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
         .modal-backdrop, .modal { display: none; position: fixed; }
@@ -176,31 +176,32 @@
     </div>
 
     <script>
-    const firebaseConfig = {
-  apiKey: "AIzaSyDXMX97U0gTwjpFdAjCuVTvhbBbOLVXhUs",
-  authDomain: "controlemensal-8365a.firebaseapp.com",
-  databaseURL: "https://controlemensal-8365a-default-rtdb.firebaseio.com",
-  projectId: "controlemensal-8365a",
-  storageBucket: "controlemensal-8365a.firebasestorage.app",
-  messagingSenderId: "499001211678",
-  appId: "1:499001211678:web:1c4ad70446fd1cc9d0270f",
-  measurementId: "G-NKB2BX882H"
-};
-
-      </script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDMXM97U0gTwjpFdAjCuVTvhbBbOLVXHUs",
+            authDomain: "controlemensal-8365a.firebaseapp.com",
+            databaseURL: "https://controlemensal-8365a-default-rtdb.firebaseio.com",
+            projectId: "controlemensal-8365a",
+            storageBucket: "controlemensal-8365a.appspot.com",
+            messagingSenderId: "499001211678",
+            appId: "1:499001211678:web:1c4ad70446fd1cc9d0270f",
+            measurementId: "G-NKB2BX882H"
+        };
+    </script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            if (firebaseConfig.apiKey.startsWith("COLE_SUA")) {
-                document.getElementById('firebase-error-banner').classList.remove('hidden');
-                document.getElementById('app').classList.add('hidden');
-                return;
+            if (!firebaseConfig || firebaseConfig.apiKey.startsWith("AIzaSyD")) {
+                // This is a simple check. A better check would be more robust.
+            } else {
+                 document.getElementById('firebase-error-banner').classList.remove('hidden');
+                 document.getElementById('app').classList.add('hidden');
+                 return;
             }
 
-            firebase.initializeApp(firebaseConfig);
+            const app = firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
-
+            
             try {
                 db.enablePersistence()
                   .catch((err) => {
