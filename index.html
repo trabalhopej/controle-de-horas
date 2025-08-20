@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Controle de Horas v2</title>
+    <title>Painel de Controle de Horas</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJzaG9ydF9uYW1lIjogIkhvcmFzIEFwcCIsCiAgIm5hbWUiOiAiUGFpbmVsIGRlIENvbnRyb2xlIGRlIEhvcmFzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vMTkyeDE5Mi8wZDk0ODgvZmZmZmZmP3RleHQ9SG9yYXMiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiIKICAgIH0sCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vNTEyeDUxMi8wZDk0ODgvZmZmZmZmP3RleHQ9SG9yYXMiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIKICAgIH0KICBdLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgInRoZW1lX2NvbG9yIjogIiMwZjc2NmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiCn0=">
+    <meta name="theme-color" content="#0f766e">
+
     <!-- Firebase SDKs v9 -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
@@ -191,9 +196,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            if (!firebaseConfig || firebaseConfig.apiKey.startsWith("AIzaSyD")) {
-                // This is a simple check. A better check would be more robust.
-            } else {
+            if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE")) {
                  document.getElementById('firebase-error-banner').classList.remove('hidden');
                  document.getElementById('app').classList.add('hidden');
                  return;
@@ -640,11 +643,24 @@
                 state.hourlyRate = parseFloat(elements.hourlyRateInput.value);
                 setupEventListeners();
                 listenForMonthlyChanges();
+                
+                // Register Service Worker for PWA
+                const swCode = `
+                  self.addEventListener('install', (e) => {});
+                  self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request)));
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.register(swUrl)
+                    .then((reg) => console.log('Service worker registered.', reg))
+                    .catch((err) => console.error('Service worker registration failed.', err));
+                }
             };
 
             init();
         });
     </script>
 </body>
-
 </html>
